@@ -1,0 +1,52 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: frontend
+  labels:
+    name: frontend
+---
+apiVersion: apps/v1          # ← was "applications/v1"
+kind: Deployment             # ← was "Application"
+metadata:
+  name: frontend
+  namespace: frontend
+  labels:
+    app: frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+        - name: frontend-service
+          image: calude-micro-svc-frontend:latest  # ← verify image name
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 80
+          env:
+            - name: AUTH_SVC_HOST
+              value: "auth-svc.authentication.svc.cluster.local"
+            - name: AUTH_SVC_PORT
+              value: "3001"
+            - name: NOTES_SVC_HOST
+              value: "notes-svc.notes.svc.cluster.local"
+            - name: NOTES_SVC_PORT
+              value: "3002"
+          readinessProbe:
+            httpGet:                 # ← was "httpPath/httpPort" — invalid
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: "30m"
+              memory: "32Mi"
+            limits:
+              cpu: "100m"
+              memory: "64Mi"

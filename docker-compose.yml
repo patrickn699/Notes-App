@@ -1,0 +1,65 @@
+version: "3.9"
+
+services:
+  # ── Frontend Service ────────────────────────────────────────────────────────────
+  frontend:
+    build: ./frontend
+    container_name: frontend
+    ports:
+      - "8080:80"            # open http://localhost:8080 in browser
+    environment:
+      AUTH_SVC_HOST: auth-service
+      AUTH_SVC_PORT: 3001
+      NOTES_SVC_HOST: notes-service
+      NOTES_SVC_PORT: 3002
+    depends_on:
+      - auth-service
+      - notes-service
+    restart: unless-stopped
+    networks:
+      - app-net
+  
+  # ── Auth Service ────────────────────────────────────────────────────────────
+  auth-service:
+    build: ./auth-service
+    container_name: auth-service
+    ports:
+      - "3001:3001"          # expose for direct testing (curl/Postman)
+    environment:
+      PORT: 3001
+      JWT_SECRET: ${JWT_SECRET:-super-secret-dev-key-change-me}
+    restart: unless-stopped
+    networks:
+      - app-net
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ── Notes Service ───────────────────────────────────────────────────────────
+  notes-service:
+    build: ./notes-service
+    container_name: notes-service
+    ports:
+      - "3002:3002"          # expose for direct testing
+    environment:
+      PORT: 3002
+      AUTH_SERVICE_URL: http://auth-service:3001   # internal DNS via docker network
+    depends_on:
+      auth-service:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - app-net
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3002/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    
+
+
+networks:
+  app-net:
+    driver: bridge

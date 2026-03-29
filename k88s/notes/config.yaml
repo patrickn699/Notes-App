@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: notes             # ← was "notes-app" — must match the notes Deployment namespace
+data:
+  # Full cross-namespace DNS: <service>.<namespace>.svc.cluster.local
+  auth-service-url: "http://auth-svc.authentication.svc.cluster.local:3001"

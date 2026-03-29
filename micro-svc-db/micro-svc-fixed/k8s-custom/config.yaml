@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: notes
+data:
+  auth-service-url: "http://auth-svc.authentication.svc.cluster.local:3001"

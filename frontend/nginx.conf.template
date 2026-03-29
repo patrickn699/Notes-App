@@ -1,0 +1,44 @@
+server {
+    listen 80;
+    server_name _;
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # Proxy /api/auth/* → auth-service (strips /api/auth prefix)
+    location /api/auth/ {
+        proxy_pass         http://${AUTH_SVC_HOST}:${AUTH_SVC_PORT}/; #http://auth-service:3001/;
+        proxy_http_version 1.1;
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   Authorization     $http_authorization;
+        proxy_pass_header  Authorization;
+
+        proxy_no_cache     1;
+        proxy_cache_bypass 1;
+
+        add_header X-Served-By auth-service always;
+    }
+
+    # Proxy /api/notes/* → notes-service (strips /api/notes prefix)
+    location /api/notes/ {
+        proxy_pass         http://${NOTES_SVC_HOST}:${NOTES_SVC_PORT}/; #http://notes-service:3002/;
+        proxy_http_version 1.1;
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   Authorization     $http_authorization;
+        proxy_pass_header  Authorization;
+
+        proxy_no_cache     1;
+        proxy_cache_bypass 1;
+
+        add_header X-Served-By notes-service always;
+    }
+
+    # Serve static frontend for everything else
+    location / {
+        try_files $uri $uri/ /index.html;
+        add_header Cache-Control "no-store, no-cache, must-revalidate";
+    }
+}

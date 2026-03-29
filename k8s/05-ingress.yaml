@@ -1,0 +1,27 @@
+# Optional: Apply this if you have an Ingress Controller installed
+# For minikube: run `minikube addons enable ingress` first
+# For kind:     install nginx-ingress via helm
+#
+# With this applied, the app is accessible at http://localhost
+# (or http://<minikube-ip> on minikube)
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: app-ingress
+  namespace: default
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+spec:
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths:
+          # Frontend — catch-all
+          - path: /()(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: frontend
+                port:
+                  number: 80

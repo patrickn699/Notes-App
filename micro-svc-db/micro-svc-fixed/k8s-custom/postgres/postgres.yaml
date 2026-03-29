@@ -1,0 +1,118 @@
+# ── Namespace ──────────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: database
+---
+# ── PersistentVolumeClaim ──────────────────────────────────────────────────────
+# A PVC is a request for storage. Kubernetes finds a matching PersistentVolume
+# and binds it. On minikube it uses hostPath (local disk). On AKS it provisions
+# an Azure Disk automatically.
+# This is what makes data survive pod restarts — the data lives on the PVC,
+# not inside the container.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+  namespace: database
+spec:
+  accessModes:
+    - ReadWriteOnce      # only one pod can mount this at a time (fine for Postgres)
+  resources:
+    requests:
+      storage: 1Gi       # request 1GB of storage
+---
+# ── ConfigMap — init SQL ───────────────────────────────────────────────────────
+# Stores the SQL script that creates authdb and notesdb on first startup.
+# Mounted as a file inside the Postgres container.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init
+  namespace: database
+data:
+  init.sql: |
+    CREATE DATABASE authdb;
+    CREATE DATABASE notesdb;
+---
+# ── StatefulSet ────────────────────────────────────────────────────────────────
+# StatefulSet is used instead of Deployment for databases because:
+# - Pods get stable, predictable names (postgres-0, postgres-1)
+# - Each pod gets its own PVC
+# - Pods start and stop in order
+# For a single-replica DB like ours, a Deployment with a PVC also works,
+# but StatefulSet is the correct K8s pattern for stateful workloads.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: database
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: username
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: password
+            - name: POSTGRES_DB
+              value: postgres
+          volumeMounts:
+            - name: postgres-storage
+              mountPath: /var/lib/postgresql/data   # where Postgres stores data
+            - name: init-script
+              mountPath: /docker-entrypoint-initdb.d # Postgres runs .sql files here on first start
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres"]
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+      volumes:
+        - name: postgres-storage
+          persistentVolumeClaim:
+            claimName: postgres-pvc    # mount the PVC we declared above
+        - name: init-script
+          configMap:
+            name: postgres-init        # mount the init SQL as a file
+---
+# ── Service ────────────────────────────────────────────────────────────────────
+# ClusterIP — only reachable inside the cluster.
+# auth-service and notes-service connect to "postgres.database.svc.cluster.local"
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: database
+spec:
+  selector:
+    app: postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
+  type: ClusterIP

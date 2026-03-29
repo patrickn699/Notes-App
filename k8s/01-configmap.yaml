@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: default
+data:
+  # Internal cluster DNS — notes-service uses this to reach auth-service
+  auth-service-url: "http://auth-service:3001"

@@ -1,0 +1,57 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: notes
+  labels:
+    name: notes
+---
+apiVersion: apps/v1          # ← was "applications/v1"
+kind: Deployment             # ← was "Application"
+metadata:
+  name: notes-app
+  namespace: notes
+  labels:
+    app: notes-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: notes-app
+  template:
+    metadata:
+      labels:
+        app: notes-app
+    spec:
+      containers:
+        - name: notes-service
+          image: calude-micro-svc-notes-service:latest  # ← verify image name
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 3002
+          env:
+            - name: PORT
+              value: "3002"
+            - name: AUTH_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: auth-service-url
+          readinessProbe:
+            httpGet:                 # ← was "httpPath/httpPort" — invalid, must use httpGet
+              path: /health          # ← was "/" — use the actual health endpoint
+              port: 3002
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:                 # ← same fix
+              path: /health
+              port: 3002
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: "30m"
+              memory: "32Mi"
+            limits:
+              cpu: "100m"
+              memory: "64Mi"
