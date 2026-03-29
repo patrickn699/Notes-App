@@ -1,6 +1,52 @@
 version: "3.9"
 
 services:
+  # __ PostgreSQL ────────────────────────────────────────────────────────────────
+  # Single Postgres instance serving both auth and notes databases.
+  # In K8s you'd run this as a StatefulSet with a PVC.
+  postgres:
+    image: postgres:16-alpine
+    container_name: postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres123
+      POSTGRES_DB: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data   # data persists across restarts
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql  # create DBs on first run
+    networks:
+      - app-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  # Note: In production, use a managed DB service or run Postgres in a separate cluster with proper backups and scaling.
+  # -- MinIO ─────────────────────────────────────────────────────────────────────
+  # MinIO is open-source, Azure Blob / S3 compatible object storage.
+  # Runs locally so you can develop without needing real Azure Blob Storage.
+  # On AKS you swap BLOB_ENDPOINT for your real Azure Blob Storage URL.
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    ports:
+      - "9000:9000"    # API port (what our app talks to)
+      - "9001:9001"    # Web console — open http://localhost:9001 to browse blobs
+    volumes:
+      - minio-data:/data                          # blob data persists across restarts
+    networks:
+      - app-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
   # ── Frontend Service ────────────────────────────────────────────────────────────
   frontend:
     build: ./frontend
@@ -12,9 +58,16 @@ services:
       AUTH_SVC_PORT: 3001
       NOTES_SVC_HOST: notes-service
       NOTES_SVC_PORT: 3002
+      PG_HOST: postgres
+      PG_USER: postgres
+      PG_DB: postgres
+      PG_PASSWORD: postgres123
+      PG_PORT: 5432
     depends_on:
-      - auth-service
-      - notes-service
+      # - auth-service
+      # - notes-service
+      postgres:
+          condition: service_healthy
     restart: unless-stopped
     networks:
       - app-net
@@ -46,8 +99,21 @@ services:
     environment:
       PORT: 3002
       AUTH_SERVICE_URL: http://auth-service:3001   # internal DNS via docker network
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_DB: notesdb
+      PG_USER: postgres
+      PG_PASSWORD: postgres123
+      BLOB_ENDPOINT: http://minio:9000
+      BLOB_ACCOUNT: minioadmin
+      BLOB_KEY: minioadmin123
+      BLOB_CONTAINER: notes
     depends_on:
       auth-service:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      minio:
         condition: service_healthy
     restart: unless-stopped
     networks:
@@ -58,7 +124,9 @@ services:
       timeout: 5s
       retries: 3
     
-
+volumes:
+  postgres-data: # named volume — survives docker compose down
+  minio-data:    # named volume — survives docker compose down
 
 networks:
   app-net:

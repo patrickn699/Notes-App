@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Notepad — K8s Demo App</title>
+  
 
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -72,6 +73,13 @@
       font-size: 13px;
       color: var(--muted);
       margin-bottom: 36px;
+      font-family: 'Courier New', Courier, monospace;
+    }
+
+    .version-auth-tagline {
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 38px;
       font-family: 'Courier New', Courier, monospace;
     }
 
@@ -416,6 +424,7 @@
   <div class="auth-card">
     <div class="auth-logo">notepad.</div>
     <div class="auth-tagline">// kubernetes demo app</div>
+    <div class="version-auth-tagline">// v1.1.0 — postgres + blob storage</div>
 
     <div class="tab-row">
       <button class="tab-btn active" onclick="switchTab('login')">Sign In</button>
