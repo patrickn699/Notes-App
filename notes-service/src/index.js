@@ -3,7 +3,7 @@ const axios = require("axios");
 const cors = require("cors");
 const { v4: uuidv4 } = require("uuid");
 const { Pool } = require("pg");
-const { BlobServiceClient, StorageSharedKeyCredential } = require("@azure/storage-blob");
+const { BlobServiceClient } = require("@azure/storage-blob");
 
 const app = express();
 app.use(express.json());
@@ -11,9 +11,27 @@ app.use(cors());
 
 const PORT = process.env.PORT || 3002;
 const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL || "http://localhost:3001";
+const BLOB_CONTAINER = process.env.BLOB_CONTAINER || "notes";
 
-// ── PostgreSQL connection pool ─────────────────────────────────────────────────
-// Stores note metadata: id, title, username, blob_key, timestamps
+// ── Blob client (Azurite locally, real Azure Blob on AKS) ─────────────────────
+// Uses connection string — same code works for both Azurite and real Azure Blob.
+// Locally: BLOB_CONNECTION_STRING points to Azurite
+// On AKS:  BLOB_CONNECTION_STRING points to real Azure Storage account
+const blobServiceClient = BlobServiceClient.fromConnectionString(
+  process.env.BLOB_CONNECTION_STRING
+);
+
+// ── PostgreSQL connection pools ────────────────────────────────────────────────
+// adminPool connects to default "postgres" DB to create notesdb if missing.
+const adminPool = new Pool({
+  host:     process.env.PG_HOST     || "localhost",
+  port:     process.env.PG_PORT     || 5432,
+  database: "postgres",
+  user:     process.env.PG_USER     || "postgres",
+  password: process.env.PG_PASSWORD || "postgres",
+});
+
+// pool connects to notesdb for all app queries.
 const pool = new Pool({
   host:     process.env.PG_HOST     || "localhost",
   port:     process.env.PG_PORT     || 5432,
@@ -22,24 +40,18 @@ const pool = new Pool({
   password: process.env.PG_PASSWORD || "postgres",
 });
 
-// ── MinIO / Azure Blob client ──────────────────────────────────────────────────
-// MinIO is S3/Azure Blob compatible. On local/minikube we point at MinIO.
-// On AKS you swap BLOB_ENDPOINT + BLOB_KEY for real Azure Blob Storage — 
-// the code stays identical because @azure/storage-blob works with both.
-const BLOB_ENDPOINT   = process.env.BLOB_ENDPOINT   || "http://localhost:9000";
-const BLOB_ACCOUNT    = process.env.BLOB_ACCOUNT    || "minioadmin";
-const BLOB_KEY        = process.env.BLOB_KEY        || "minioadmin";
-const BLOB_CONTAINER  = process.env.BLOB_CONTAINER  || "notes";
-
-// BlobServiceClient connects using a connection string.
-// For MinIO we build the connection string manually from endpoint + credentials.
-const sharedKeyCredential = new StorageSharedKeyCredential(BLOB_ACCOUNT, BLOB_KEY);
-const blobServiceClient = new BlobServiceClient(BLOB_ENDPOINT, sharedKeyCredential);
-
-// ── Create notes table if it doesn't exist ────────────────────────────────────
-// blob_key is the filename stored in MinIO — e.g. "username/note-id.txt"
-// We don't store content here, only a pointer to the blob.
+// ── Create database + table if they don't exist ───────────────────────────────
 async function initDB() {
+  const dbName = process.env.PG_DB || "notesdb";
+
+  const exists = await adminPool.query(
+    "SELECT 1 FROM pg_database WHERE datname = $1", [dbName]
+  );
+  if (exists.rows.length === 0) {
+    await adminPool.query("CREATE DATABASE " + dbName);
+    console.log("[notes-service] created database: " + dbName);
+  }
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS notes (
       id         TEXT PRIMARY KEY,
@@ -54,8 +66,6 @@ async function initDB() {
 }
 
 // ── Ensure blob container exists ──────────────────────────────────────────────
-// A container in MinIO/Azure Blob is like a bucket — a top-level folder.
-// "notes" container will hold all note content files.
 async function initBlob() {
   const containerClient = blobServiceClient.getContainerClient(BLOB_CONTAINER);
   await containerClient.createIfNotExists();
@@ -80,8 +90,7 @@ async function authenticate(req, res, next) {
   }
 }
 
-// ── Helper: upload content to MinIO ──────────────────────────────────────────
-// blobKey = "username/note-id.txt" — organises blobs per user
+// ── Helper: upload content to blob storage ────────────────────────────────────
 async function uploadBlob(blobKey, content) {
   const containerClient = blobServiceClient.getContainerClient(BLOB_CONTAINER);
   const blockBlobClient = containerClient.getBlockBlobClient(blobKey);
@@ -90,12 +99,11 @@ async function uploadBlob(blobKey, content) {
   });
 }
 
-// ── Helper: download content from MinIO ──────────────────────────────────────
+// ── Helper: download content from blob storage ────────────────────────────────
 async function downloadBlob(blobKey) {
   const containerClient = blobServiceClient.getContainerClient(BLOB_CONTAINER);
   const blockBlobClient = containerClient.getBlockBlobClient(blobKey);
   const response = await blockBlobClient.download(0);
-  // Stream the response into a string
   const chunks = [];
   for await (const chunk of response.readableStreamBody) {
     chunks.push(chunk);
@@ -120,10 +128,7 @@ app.get("/health", async (req, res) => {
   }
 });
 
-// ── Get all notes for user ────────────────────────────────────────────────────
-// Returns metadata from Postgres + fetches content from MinIO for each note.
-// For large note lists you'd paginate and fetch content lazily, but for
-// learning purposes we fetch everything upfront.
+// ── Get all notes ─────────────────────────────────────────────────────────────
 app.get("/notes", authenticate, async (req, res) => {
   try {
     const result = await pool.query(
@@ -131,7 +136,6 @@ app.get("/notes", authenticate, async (req, res) => {
       [req.username]
     );
 
-    // Fetch content for each note from MinIO
     const notes = await Promise.all(
       result.rows.map(async (row) => {
         const content = await downloadBlob(row.blob_key);
@@ -154,9 +158,6 @@ app.get("/notes", authenticate, async (req, res) => {
 });
 
 // ── Create a note ─────────────────────────────────────────────────────────────
-// 1. Generate a unique ID
-// 2. Upload content to MinIO as "username/id.txt"
-// 3. Save metadata (id, title, blob_key) to Postgres
 app.post("/notes", authenticate, async (req, res) => {
   const { title, content } = req.body;
   if (!title || !content) {
@@ -188,7 +189,6 @@ app.post("/notes", authenticate, async (req, res) => {
 });
 
 // ── Update a note ─────────────────────────────────────────────────────────────
-// Updates title in Postgres and overwrites content blob in MinIO
 app.put("/notes/:id", authenticate, async (req, res) => {
   const { title, content } = req.body;
 
@@ -219,7 +219,6 @@ app.put("/notes/:id", authenticate, async (req, res) => {
 });
 
 // ── Delete a note ─────────────────────────────────────────────────────────────
-// Deletes blob from MinIO first, then removes row from Postgres
 app.delete("/notes/:id", authenticate, async (req, res) => {
   try {
     const result = await pool.query(

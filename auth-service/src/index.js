@@ -11,9 +11,18 @@ app.use(cors());
 const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-change-in-prod";
 const PORT = process.env.PORT || 3001;
 
-// ── PostgreSQL connection pool ─────────────────────────────────────────────────
-// Pool manages multiple connections — reuses them instead of opening a new one
-// per request. All config comes from env vars injected by K8s Secret/ConfigMap.
+// ── PostgreSQL connection pools ────────────────────────────────────────────────
+// adminPool connects to the default "postgres" DB — always exists.
+// Used only during startup to create authdb if it doesn't exist.
+const adminPool = new Pool({
+  host:     process.env.PG_HOST     || "localhost",
+  port:     process.env.PG_PORT     || 5432,
+  database: "postgres",
+  user:     process.env.PG_USER     || "postgres",
+  password: process.env.PG_PASSWORD || "postgres",
+});
+
+// pool connects to authdb — used for all app queries (register, login, verify)
 const pool = new Pool({
   host:     process.env.PG_HOST     || "localhost",
   port:     process.env.PG_PORT     || 5432,
@@ -22,10 +31,20 @@ const pool = new Pool({
   password: process.env.PG_PASSWORD || "postgres",
 });
 
-// ── Create users table if it doesn't exist ────────────────────────────────────
-// This runs once on startup. In production you'd use a migration tool like
-// Flyway or Liquibase, but for learning this is fine.
+// ── Create database + table if they don't exist ───────────────────────────────
+// Step 1: use adminPool to create authdb if missing (can't CREATE DATABASE IF NOT EXISTS in Postgres)
+// Step 2: use pool to create the users table inside authdb
 async function initDB() {
+  const dbName = process.env.PG_DB || "authdb";
+
+  const exists = await adminPool.query(
+    "SELECT 1 FROM pg_database WHERE datname = $1", [dbName]
+  );
+  if (exists.rows.length === 0) {
+    await adminPool.query("CREATE DATABASE " + dbName);
+    console.log("[auth-service] created database: " + dbName);
+  }
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS users (
       username   TEXT PRIMARY KEY,
@@ -131,7 +150,7 @@ async function start() {
       break;
     } catch (err) {
       retries--;
-      console.log("[auth-service] waiting for DB... (" + retries + " retries left)");
+      console.log("[auth-service] waiting for DB... (" + retries + " retries left): " + err.message);
       await new Promise(r => setTimeout(r, 2000));
     }
   }
