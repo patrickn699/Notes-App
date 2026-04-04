@@ -58,16 +58,9 @@ services:
       AUTH_SVC_PORT: 3001
       NOTES_SVC_HOST: notes-service
       NOTES_SVC_PORT: 3002
-      PG_HOST: postgres
-      PG_USER: postgres
-      PG_DB: postgres
-      PG_PASSWORD: postgres123
-      PG_PORT: 5432
     depends_on:
-      # - auth-service
-      # - notes-service
-      postgres:
-          condition: service_healthy
+      - auth-service
+      - notes-service
     restart: unless-stopped
     networks:
       - app-net
@@ -81,6 +74,14 @@ services:
     environment:
       PORT: 3001
       JWT_SECRET: ${JWT_SECRET:-super-secret-dev-key-change-me}
+      PG_HOST: postgres
+      PG_USER: postgres
+      PG_DB: postgres
+      PG_PASSWORD: postgres123
+      PG_PORT: 5432
+    depends_on:
+      postgres:
+          condition: service_healthy
     restart: unless-stopped
     networks:
       - app-net

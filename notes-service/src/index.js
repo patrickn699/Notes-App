@@ -3,7 +3,7 @@ const axios = require("axios");
 const cors = require("cors");
 const { v4: uuidv4 } = require("uuid");
 const { Pool } = require("pg");
-const { BlobServiceClient } = require("@azure/storage-blob");
+const { BlobServiceClient, StorageSharedKeyCredential } = require("@azure/storage-blob");
 
 const app = express();
 app.use(express.json());
@@ -33,13 +33,8 @@ const BLOB_CONTAINER  = process.env.BLOB_CONTAINER  || "notes";
 
 // BlobServiceClient connects using a connection string.
 // For MinIO we build the connection string manually from endpoint + credentials.
-const blobServiceClient = new BlobServiceClient(
-  BLOB_ENDPOINT,
-  {
-    accountName: BLOB_ACCOUNT,
-    accountKey:  BLOB_KEY,
-  }
-);
+const sharedKeyCredential = new StorageSharedKeyCredential(BLOB_ACCOUNT, BLOB_KEY);
+const blobServiceClient = new BlobServiceClient(BLOB_ENDPOINT, sharedKeyCredential);
 
 // ── Create notes table if it doesn't exist ────────────────────────────────────
 // blob_key is the filename stored in MinIO — e.g. "username/note-id.txt"
@@ -63,7 +58,7 @@ async function initDB() {
 // "notes" container will hold all note content files.
 async function initBlob() {
   const containerClient = blobServiceClient.getContainerClient(BLOB_CONTAINER);
-  await containerClient.createIfNotExists({ access: "private" });
+  await containerClient.createIfNotExists();
   console.log("[notes-service] blob container ready");
 }
 
