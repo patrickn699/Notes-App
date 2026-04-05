@@ -87,6 +87,10 @@ app.post("/register", async (req, res) => {
       "INSERT INTO users (username, hash) VALUES ($1, $2)",
       [username, hash]
     );
+    console.log("User inserted:", username);
+
+    const allUsers = await pool.query("SELECT * FROM users");
+    console.log(allUsers.rows);
 
     const token = jwt.sign({ username }, JWT_SECRET, { expiresIn: "24h" });
     res.status(201).json({ token, username });
