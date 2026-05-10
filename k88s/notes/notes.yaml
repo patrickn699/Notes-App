@@ -36,6 +36,23 @@ spec:
                 configMapKeyRef:
                   name: app-config
                   key: auth-service-url
+            # Postgres
+            - name: PG_HOST
+              value: "postgres.database.svc.cluster.local"
+            - name: PG_PORT
+              value: "5432"
+            - name: PG_DB
+              value: "notesdb"
+            - name: PG_USER
+              valueFrom:
+                secretKeyRef:
+                  name: pg-credentials
+                  key: username
+            - name: PG_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: pg-credentials
+                  key: password
           readinessProbe:
             httpGet:                 # ← was "httpPath/httpPort" — invalid, must use httpGet
               path: /health          # ← was "/" — use the actual health endpoint

@@ -92,7 +92,7 @@ services:
       JWT_SECRET: ${JWT_SECRET:-super-secret-dev-key-change-me}
       PG_HOST: postgres
       PG_USER: postgres
-      PG_DB: postgres
+      PG_DB: authdb #postgres
       PG_PASSWORD: postgres123
       PG_PORT: 5432
     depends_on:

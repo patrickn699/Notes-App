@@ -38,10 +38,12 @@ async function initDB() {
   const dbName = process.env.PG_DB || "authdb";
 
   const exists = await adminPool.query(
+    
     "SELECT 1 FROM pg_database WHERE datname = $1", [dbName]
   );
   if (exists.rows.length === 0) {
     await adminPool.query("CREATE DATABASE " + dbName);
+    //await pool.query("CREATE DATABASE " + dbName);
     console.log("[auth-service] created database: " + dbName);
   }
 

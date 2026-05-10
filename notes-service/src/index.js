@@ -136,7 +136,10 @@ app.get("/notes", authenticate, async (req, res) => {
       [req.username]
     );
 
-    const notes = await Promise.all(
+    // Promise.allSettled instead of Promise.all
+    // — allSettled waits for ALL promises regardless of failures
+    // — Promise.all stops and throws on the FIRST failure
+    const settled = await Promise.allSettled(
       result.rows.map(async (row) => {
         const content = await downloadBlob(row.blob_key);
         return {
@@ -149,6 +152,16 @@ app.get("/notes", authenticate, async (req, res) => {
         };
       })
     );
+
+    // Filter out failed blobs — return whatever succeeded
+    const notes = settled
+      .filter(r => r.status === "fulfilled")
+      .map(r => r.value);
+
+    // Log any failures so you can debug
+    settled
+      .filter(r => r.status === "rejected")
+      .forEach(r => console.error("[GET /notes] blob fetch failed:", r.reason?.message));
 
     res.json(notes);
   } catch (err) {

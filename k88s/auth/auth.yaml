@@ -36,6 +36,23 @@ spec:
                 secretKeyRef:
                   name: app-secrets
                   key: jwt-secret
+            # Postgres — points to postgres service in database namespace
+            - name: PG_HOST
+              value: "postgres.database.svc.cluster.local"
+            - name: PG_PORT
+              value: "5432"
+            - name: PG_DB
+              value: "authdb"
+            - name: PG_USER
+              valueFrom:
+                secretKeyRef:
+                  name: pg-credentials
+                  key: username
+            - name: PG_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: pg-credentials
+                  key: password
           readinessProbe:
             httpGet:                 # ← was missing httpGet wrapper
               path: /health

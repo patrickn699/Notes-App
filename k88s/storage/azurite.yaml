@@ -1,0 +1,78 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: storage
+  labels:
+    name: storage
+---
+# PVC — 2Gi for blob storage
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: azurite-pvc
+  namespace: storage
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+---
+# StatefulSet for Azurite — Microsoft's local Azure Blob emulator
+# On AKS you remove this entirely and use real Azure Blob Storage
+# by just changing the connection string in the notes Secret
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: azurite
+  namespace: storage
+spec:
+  serviceName: azurite
+  replicas: 1
+  selector:
+    matchLabels:
+      app: azurite
+  template:
+    metadata:
+      labels:
+        app: azurite
+    spec:
+      containers:
+        - name: azurite
+          image: mcr.microsoft.com/azure-storage/azurite:latest
+          command: ["azurite-blob", "--blobHost", "0.0.0.0", "--blobPort", "10000", "--location", "/data"]
+          ports:
+            - containerPort: 10000
+          volumeMounts:
+            - name: azurite-storage
+              mountPath: /data
+          readinessProbe:
+            tcpSocket:
+              port: 10000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "128Mi"
+            limits:
+              cpu: "200m"
+              memory: "256Mi"
+      volumes:
+        - name: azurite-storage
+          persistentVolumeClaim:
+            claimName: azurite-pvc
+---
+# ClusterIP Service — reachable at azurite.storage.svc.cluster.local:10000
+apiVersion: v1
+kind: Service
+metadata:
+  name: azurite
+  namespace: storage
+spec:
+  selector:
+    app: azurite
+  ports:
+    - port: 10000
+      targetPort: 10000
+  type: ClusterIP
