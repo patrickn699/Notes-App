@@ -572,22 +572,42 @@
     }
   }
 
+  // function handleLogout() {
+  //   token = null; currentUser = null; notes = []; activeNoteId = null;
+  //   document.getElementById('app-screen').style.display = 'none';
+  //   document.getElementById('auth-screen').style.display = 'block';
+  //   document.getElementById('login-username').value = '';
+  //   document.getElementById('login-password').value = '';
+  //   switchTab('login');
+  // }
+
   function handleLogout() {
-    token = null; currentUser = null; notes = []; activeNoteId = null;
-    document.getElementById('app-screen').style.display = 'none';
-    document.getElementById('auth-screen').style.display = 'block';
-    document.getElementById('login-username').value = '';
-    document.getElementById('login-password').value = '';
-    switchTab('login');
-  }
+  token = null; currentUser = null; notes = []; activeNoteId = null;
+  
+  // Hide app screen completely first
+  document.getElementById('app-screen').style.display = 'none';
+  
+  // Then show auth screen — must be flex to centre the card
+  document.getElementById('auth-screen').style.display = 'flex';
+  
+  document.getElementById('login-username').value = '';
+  document.getElementById('login-password').value = '';
+  switchTab('login');
+}
 
   // ── App entry ──────────────────────────────────────────────────────────────
+  // async function enterApp() {
+  //   document.getElementById('auth-screen').style.display = 'none';
+  //   document.getElementById('app-screen').style.display = 'block';
+  //   document.getElementById('header-username').textContent = currentUser;
+  //   await loadNotes();
+  // }
   async function enterApp() {
-    document.getElementById('auth-screen').style.display = 'none';
-    document.getElementById('app-screen').style.display = 'block';
-    document.getElementById('header-username').textContent = currentUser;
-    await loadNotes();
-  }
+  document.getElementById('auth-screen').style.display = 'none';
+  document.getElementById('app-screen').style.display = 'block'; // app uses block
+  document.getElementById('header-username').textContent = currentUser;
+  await loadNotes();
+}
 
   // ── Notes CRUD ─────────────────────────────────────────────────────────────
   async function loadNotes() {
