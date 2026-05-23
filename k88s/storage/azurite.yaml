@@ -5,6 +5,20 @@ metadata:
   labels:
     name: storage
 ---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: azurite-pv
+spec:
+  capacity:
+    storage: 2Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: standard
+  hostPath:
+    path: /data/azurite
+---
 # PVC — 2Gi for blob storage
 apiVersion: v1
 kind: PersistentVolumeClaim

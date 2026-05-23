@@ -16,6 +16,20 @@ stringData:
   username: postgres
   password: postgres123
 ---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: postgres-pv
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain   # ← keeps data even if PVC is deleted
+  storageClassName: standard
+  hostPath:
+    path: /data/postgres 
+---
 # PVC — requests 1Gi of persistent storage
 # minikube provisions this automatically from local disk
 # AKS provisions this automatically as an Azure Disk
