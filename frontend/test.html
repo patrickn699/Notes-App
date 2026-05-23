@@ -1,0 +1,1028 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Notepad — K8s Demo App</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%230a0a0f'/%3E%3Ctext x='50' y='72' font-size='65' font-family='Georgia,serif' fill='%237cb800' text-anchor='middle'%3En.%3C/text%3E%3C/svg%3E">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --accent:      #7cb800;
+      --accent-dim:  rgba(124,184,0,0.12);
+      --accent-text: #5a8a00;
+      --bg:          #f5f5f3;
+      --surface:     #ffffff;
+      --border:      rgba(0,0,0,0.08);
+      --border-md:   rgba(0,0,0,0.12);
+      --text:        #1a1a18;
+      --text-2:      #6b6b68;
+      --text-3:      #a0a09c;
+      --rail-bg:     #f0efed;
+      --sidebar-bg:  #f7f7f5;
+      --r-md:        8px;
+      --r-lg:        12px;
+    }
+
+    html, body {
+      height: 100%;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 15px;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    /* ── Transitions ── */
+    #auth-screen, #app-screen { transition: opacity 0.2s ease; }
+
+    /* ═══════════════════════════════════════════════
+       AUTH SCREEN
+    ═══════════════════════════════════════════════ */
+    #auth-screen {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      position: relative;
+      background: #fafaf8;
+    }
+
+    /* subtle dot grid */
+    #auth-screen::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: radial-gradient(circle, rgba(0,0,0,0.12) 1px, transparent 1px);
+      background-size: 28px 28px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .auth-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 5px 14px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 100px;
+      font-size: 12px;
+      color: var(--text-2);
+      margin-bottom: 24px;
+      position: relative;
+      z-index: 1;
+      letter-spacing: 0.01em;
+    }
+
+    .auth-badge-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--accent);
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%       { opacity: 0.6; transform: scale(0.85); }
+    }
+
+    .auth-wrapper {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 400px;
+    }
+
+    .auth-card {
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 36px 32px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 8px 32px rgba(0,0,0,0.06);
+    }
+
+    .auth-logo {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--text);
+      letter-spacing: -0.5px;
+      margin-bottom: 2px;
+    }
+
+    .auth-logo span { color: var(--accent); }
+
+    .auth-sub {
+      font-size: 13px;
+      color: var(--text-2);
+      margin-bottom: 28px;
+    }
+
+    .tab-row {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 24px;
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 9px 0;
+      border: none;
+      border-bottom: 2px solid transparent;
+      background: transparent;
+      color: var(--text-3);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      margin-bottom: -1px;
+      transition: color 0.15s, border-color 0.15s;
+    }
+
+    .tab-btn.active {
+      color: var(--text);
+      border-bottom-color: var(--accent);
+    }
+
+    .form-group { margin-bottom: 14px; }
+
+    .form-group label {
+      display: block;
+      font-size: 12px;
+      color: var(--text-2);
+      margin-bottom: 5px;
+    }
+
+    .form-group input {
+      width: 100%;
+      padding: 10px 12px;
+      background: #f9f9f7;
+      border: 1px solid var(--border);
+      border-radius: var(--r-md);
+      color: var(--text);
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      font-family: inherit;
+    }
+
+    .form-group input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-dim);
+      background: var(--surface);
+    }
+
+    .btn-primary {
+      width: 100%;
+      padding: 11px;
+      background: var(--text);
+      color: var(--surface);
+      border: none;
+      border-radius: var(--r-md);
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      margin-top: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: opacity 0.15s, transform 0.1s;
+      font-family: inherit;
+    }
+
+    .btn-primary:hover  { opacity: 0.85; transform: translateY(-1px); }
+    .btn-primary:active { transform: translateY(0); }
+    .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+    .auth-footer {
+      font-size: 12px;
+      color: var(--text-3);
+      margin-top: 20px;
+      text-align: center;
+      position: relative;
+      z-index: 1;
+    }
+
+    .error-msg {
+      background: #fff5f5;
+      border: 1px solid rgba(220,38,38,0.2);
+      color: #c53030;
+      border-radius: var(--r-md);
+      padding: 9px 12px;
+      font-size: 13px;
+      margin-bottom: 14px;
+    }
+
+    /* ═══════════════════════════════════════════════
+       APP SCREEN — three panel layout
+    ═══════════════════════════════════════════════ */
+    #app-screen {
+      display: none;
+      height: 100vh;
+      grid-template-columns: 56px 260px 1fr;
+      grid-template-rows: 1fr;
+      overflow: hidden;
+    }
+
+    /* ── Icon Rail ── */
+    .rail {
+      background: var(--rail-bg);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 14px 0;
+      gap: 4px;
+    }
+
+    .rail-logo {
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: -1px;
+      margin-bottom: 14px;
+    }
+
+    .rail-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: var(--r-md);
+      border: none;
+      background: transparent;
+      color: var(--text-2);
+      font-size: 18px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.12s, color 0.12s;
+      position: relative;
+    }
+
+    .rail-icon:hover  { background: rgba(0,0,0,0.06); color: var(--text); }
+    .rail-icon.active { background: var(--surface); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+
+    /* tooltip */
+    .rail-icon::after {
+      content: attr(data-tip);
+      position: absolute;
+      left: calc(100% + 10px);
+      top: 50%;
+      transform: translateY(-50%);
+      background: var(--text);
+      color: var(--surface);
+      font-size: 11px;
+      padding: 4px 8px;
+      border-radius: 6px;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.15s;
+      z-index: 100;
+    }
+
+    .rail-icon:hover::after { opacity: 1; }
+
+    .rail-spacer { flex: 1; }
+
+    .rail-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: var(--accent-dim);
+      border: 1px solid rgba(124,184,0,0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--accent-text);
+      cursor: pointer;
+      position: relative;
+    }
+
+    /* logout dropdown */
+    .avatar-menu {
+      position: absolute;
+      bottom: calc(100% + 8px);
+      left: calc(100% + 8px);
+      background: var(--surface);
+      border: 1px solid var(--border-md);
+      border-radius: var(--r-lg);
+      padding: 6px;
+      min-width: 160px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+      display: none;
+      z-index: 200;
+    }
+
+    .avatar-menu.open { display: block; }
+
+    .menu-user {
+      padding: 8px 10px 10px;
+      font-size: 12px;
+      color: var(--text-2);
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 6px;
+    }
+
+    .menu-user strong {
+      display: block;
+      font-size: 13px;
+      color: var(--text);
+      margin-bottom: 1px;
+    }
+
+    .menu-item {
+      width: 100%;
+      padding: 8px 10px;
+      border: none;
+      background: transparent;
+      color: var(--text);
+      font-size: 13px;
+      cursor: pointer;
+      border-radius: var(--r-md);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-family: inherit;
+      transition: background 0.1s;
+    }
+
+    .menu-item:hover { background: #fef2f2; color: #c53030; }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      background: var(--sidebar-bg);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .sidebar-head {
+      padding: 14px 14px 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .sidebar-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-2);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .new-note-btn {
+      width: 26px;
+      height: 26px;
+      border-radius: var(--r-md);
+      background: var(--accent);
+      border: none;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+
+    .new-note-btn:hover  { opacity: 0.85; transform: scale(1.05); }
+    .new-note-btn:active { transform: scale(0.97); }
+
+    .search-wrap {
+      padding: 10px 10px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .search-input {
+      width: 100%;
+      padding: 7px 10px 7px 30px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r-md);
+      font-size: 13px;
+      color: var(--text);
+      outline: none;
+      font-family: inherit;
+      position: relative;
+    }
+
+    .search-wrap { position: relative; }
+
+    .search-icon {
+      position: absolute;
+      left: 19px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-3);
+      font-size: 14px;
+      pointer-events: none;
+    }
+
+    .search-input:focus { border-color: var(--accent); }
+
+    .notes-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 6px;
+    }
+
+    .notes-list::-webkit-scrollbar { width: 4px; }
+    .notes-list::-webkit-scrollbar-track { background: transparent; }
+    .notes-list::-webkit-scrollbar-thumb { background: var(--border-md); border-radius: 4px; }
+
+    .note-item {
+      padding: 10px 12px;
+      border-radius: var(--r-md);
+      cursor: pointer;
+      border: 1px solid transparent;
+      margin-bottom: 2px;
+      transition: background 0.1s, border-color 0.1s;
+    }
+
+    .note-item:hover:not(.active) { background: rgba(0,0,0,0.03); }
+
+    .note-item.active {
+      background: var(--surface);
+      border-color: var(--border);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+
+    .note-item.active .ni-title { color: var(--text); }
+
+    .ni-title {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text);
+      margin-bottom: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .ni-preview {
+      font-size: 12px;
+      color: var(--text-3);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .ni-date {
+      font-size: 11px;
+      color: var(--text-3);
+      margin-top: 4px;
+    }
+
+    .empty-list {
+      text-align: center;
+      padding: 48px 16px;
+      color: var(--text-3);
+    }
+
+    .empty-list-icon {
+      font-size: 32px;
+      margin-bottom: 10px;
+      opacity: 0.4;
+    }
+
+    .empty-list p { font-size: 13px; line-height: 1.6; }
+
+    /* ── Editor Pane ── */
+    .editor-pane {
+      display: flex;
+      flex-direction: column;
+      background: var(--surface);
+      overflow: hidden;
+    }
+
+    .editor-placeholder {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      color: var(--text-3);
+    }
+
+    .editor-placeholder-icon { font-size: 40px; opacity: 0.3; }
+    .editor-placeholder p { font-size: 14px; }
+
+    .editor-form {
+      display: none;
+      flex-direction: column;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .editor-toolbar {
+      padding: 12px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-save {
+      padding: 7px 16px;
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: var(--r-md);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: opacity 0.15s;
+      font-family: inherit;
+    }
+
+    .btn-save:hover    { opacity: 0.85; }
+    .btn-save:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .btn-outline {
+      padding: 7px 14px;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: var(--r-md);
+      color: var(--text-2);
+      font-size: 13px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.1s, border-color 0.1s;
+    }
+
+    .btn-outline:hover { background: var(--bg); border-color: var(--border-md); }
+
+    .btn-icon {
+      width: 32px;
+      height: 32px;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: var(--r-md);
+      color: var(--text-2);
+      font-size: 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.1s, color 0.1s;
+    }
+
+    .btn-icon:hover { background: #fef2f2; color: #c53030; border-color: rgba(220,38,38,0.2); }
+
+    .toolbar-spacer { flex: 1; }
+
+    .editor-meta {
+      padding: 2px 24px 0;
+      font-size: 11px;
+      color: var(--text-3);
+      font-family: monospace;
+    }
+
+    .editor-title-input {
+      width: 100%;
+      padding: 28px 24px 8px;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--text);
+      font-size: 30px;
+      font-weight: 600;
+      letter-spacing: -0.5px;
+      font-family: inherit;
+    }
+
+    .editor-title-input::placeholder { color: var(--text-3); }
+
+    .editor-divider {
+      height: 1px;
+      background: var(--border);
+      margin: 0 24px 16px;
+    }
+
+    .editor-content-input {
+      flex: 1;
+      padding: 0 24px 24px;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--text-2);
+      font-size: 15px;
+      line-height: 1.8;
+      resize: none;
+      font-family: inherit;
+      overflow-y: auto;
+    }
+
+    .editor-content-input::-webkit-scrollbar { width: 4px; }
+    .editor-content-input::-webkit-scrollbar-thumb { background: var(--border-md); border-radius: 4px; }
+    .editor-content-input::placeholder { color: var(--text-3); }
+
+    /* ── Toast ── */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: var(--text);
+      color: var(--surface);
+      border-radius: var(--r-lg);
+      padding: 10px 16px;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transform: translateY(16px);
+      opacity: 0;
+      transition: all 0.25s cubic-bezier(0.34,1.56,0.64,1);
+      z-index: 1000;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    }
+
+    .toast.show  { transform: translateY(0); opacity: 1; }
+    .toast.success { background: var(--accent); color: white; }
+    .toast.error   { background: #c53030; color: white; }
+  </style>
+</head>
+<body>
+
+<!-- ════════════════════════════════════════
+     AUTH SCREEN
+════════════════════════════════════════ -->
+<div id="auth-screen">
+  <div class="auth-wrapper">
+    <div class="auth-badge">
+      <div class="auth-badge-dot"></div>
+      k8s · postgres · azure blob
+    </div>
+
+    <div class="auth-card">
+      <div class="auth-logo">note<span>pad.</span></div>
+      <div class="auth-sub">Your personal knowledge base</div>
+
+      <div class="tab-row">
+        <button class="tab-btn active" onclick="switchTab('login')">Sign in</button>
+        <button class="tab-btn" onclick="switchTab('register')">Register</button>
+      </div>
+
+      <div id="auth-error" class="error-msg" style="display:none"></div>
+
+      <div id="login-form">
+        <div class="form-group">
+          <label>Username</label>
+          <input type="text" id="login-username" placeholder="your username" autocomplete="username"/>
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password"/>
+        </div>
+        <button class="btn-primary" id="login-btn" onclick="handleLogin()">
+          Continue →
+        </button>
+      </div>
+
+      <div id="register-form" style="display:none">
+        <div class="form-group">
+          <label>Username</label>
+          <input type="text" id="reg-username" placeholder="choose a username" autocomplete="username"/>
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" id="reg-password" placeholder="min 6 characters" autocomplete="new-password"/>
+        </div>
+        <button class="btn-primary" id="register-btn" onclick="handleRegister()">
+          Create account →
+        </button>
+      </div>
+    </div>
+
+    <div class="auth-footer">built on kubernetes · postgres · azure blob</div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════
+     APP SCREEN
+════════════════════════════════════════ -->
+<div id="app-screen">
+
+  <!-- Icon Rail -->
+  <nav class="rail">
+    <div class="rail-logo">n.</div>
+    <button class="rail-icon active" data-tip="Notes">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+    </button>
+    <div class="rail-spacer"></div>
+    <div class="rail-avatar" id="rail-avatar" onclick="toggleMenu()">
+      <span id="avatar-initials">?</span>
+      <div class="avatar-menu" id="avatar-menu">
+        <div class="menu-user">
+          <strong id="menu-username">—</strong>
+          signed in
+        </div>
+        <button class="menu-item" onclick="handleLogout()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          Sign out
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-head">
+      <span class="sidebar-title">Notes</span>
+      <button class="new-note-btn" onclick="newNote()" title="New note">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      </button>
+    </div>
+    <div class="search-wrap">
+      <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input class="search-input" type="text" placeholder="Search notes..." oninput="filterNotes(this.value)"/>
+    </div>
+    <div class="notes-list" id="notes-list">
+      <div class="empty-list">
+        <div class="empty-list-icon">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        </div>
+        <p>No notes yet.<br/>Click + to create one.</p>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Editor -->
+  <main class="editor-pane">
+    <div class="editor-placeholder" id="editor-placeholder">
+      <div class="editor-placeholder-icon">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      </div>
+      <p>Select a note or create a new one</p>
+    </div>
+
+    <div class="editor-form" id="editor-form">
+      <div class="editor-toolbar">
+        <button class="btn-save" id="save-btn" onclick="saveNote()">Save</button>
+        <button class="btn-outline" onclick="cancelEdit()">Cancel</button>
+        <div class="toolbar-spacer"></div>
+        <button class="btn-icon" id="delete-btn" onclick="deleteNote()" style="display:none" title="Delete note">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+        </button>
+      </div>
+      <div class="editor-meta" id="editor-meta"></div>
+      <input class="editor-title-input" id="note-title" placeholder="Untitled note" maxlength="100"/>
+      <div class="editor-divider"></div>
+      <textarea class="editor-content-input" id="note-content" placeholder="Start writing…"></textarea>
+    </div>
+  </main>
+
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+  const AUTH_URL  = "/api/auth";
+  const NOTES_URL = "/api/notes";
+
+  let token = null, currentUser = null, notes = [], activeNoteId = null, isNew = false;
+  let allNotes = [];
+
+  // ── Tabs ──────────────────────────────────────────────────────────────────
+  function switchTab(tab) {
+    document.getElementById('auth-error').style.display = 'none';
+    document.querySelectorAll('.tab-btn').forEach((b,i) =>
+      b.classList.toggle('active', (tab==='login'&&i===0)||(tab==='register'&&i===1)));
+    document.getElementById('login-form').style.display    = tab==='login'    ? '' : 'none';
+    document.getElementById('register-form').style.display = tab==='register' ? '' : 'none';
+  }
+
+  // ── Auth ──────────────────────────────────────────────────────────────────
+  async function handleLogin() {
+    const username = document.getElementById('login-username').value.trim();
+    const password = document.getElementById('login-password').value;
+    await authRequest('/login', { username, password }, 'login-btn', 'Sign in');
+  }
+
+  async function handleRegister() {
+    const username = document.getElementById('reg-username').value.trim();
+    const password = document.getElementById('reg-password').value;
+    await authRequest('/register', { username, password }, 'register-btn', 'Create account →');
+  }
+
+  async function authRequest(path, body, btnId, label) {
+    const btn = document.getElementById(btnId);
+    const errEl = document.getElementById('auth-error');
+    errEl.style.display = 'none';
+    btn.disabled = true;
+    btn.textContent = 'Please wait…';
+    try {
+      const res  = await fetch(AUTH_URL + path, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Something went wrong');
+      token = data.token;
+      currentUser = data.username;
+      enterApp();
+    } catch(e) {
+      errEl.textContent = e.message;
+      errEl.style.display = '';
+      btn.disabled = false;
+      btn.textContent = label;
+    }
+  }
+
+  function handleLogout() {
+    token = null; currentUser = null; notes = []; allNotes = []; activeNoteId = null;
+    document.getElementById('avatar-menu').classList.remove('open');
+    document.getElementById('app-screen').style.display = 'none';
+    document.getElementById('auth-screen').style.display = 'flex';
+    document.getElementById('login-username').value = '';
+    document.getElementById('login-password').value = '';
+    switchTab('login');
+  }
+
+  function toggleMenu() {
+    document.getElementById('avatar-menu').classList.toggle('open');
+  }
+
+  document.addEventListener('click', e => {
+    const avatar = document.getElementById('rail-avatar');
+    if (!avatar.contains(e.target)) {
+      document.getElementById('avatar-menu').classList.remove('open');
+    }
+  });
+
+  // ── Enter app ─────────────────────────────────────────────────────────────
+  async function enterApp() {
+    document.getElementById('auth-screen').style.display = 'none';
+    document.getElementById('app-screen').style.display  = 'grid';
+    const initials = currentUser.slice(0,2).toUpperCase();
+    document.getElementById('avatar-initials').textContent = initials;
+    document.getElementById('menu-username').textContent   = currentUser;
+    await loadNotes();
+  }
+
+  // ── Notes ─────────────────────────────────────────────────────────────────
+  async function loadNotes() {
+    try {
+      const res = await fetch(NOTES_URL + '/notes', { headers:{ 'Authorization':'Bearer ' + token } });
+      if (!res.ok) throw new Error();
+      allNotes = await res.json();
+      notes = [...allNotes];
+      renderNotesList();
+    } catch {
+      showToast('Failed to load notes', 'error');
+    }
+  }
+
+  function filterNotes(query) {
+    const q = query.toLowerCase();
+    notes = q
+      ? allNotes.filter(n => n.title.toLowerCase().includes(q) || n.content.toLowerCase().includes(q))
+      : [...allNotes];
+    renderNotesList();
+  }
+
+  function renderNotesList() {
+    const el = document.getElementById('notes-list');
+    if (notes.length === 0) {
+      el.innerHTML = '<div class="empty-list"><div class="empty-list-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div><p>No notes yet.<br/>Click + to create one.</p></div>';
+      return;
+    }
+    el.innerHTML = notes.map(n => `
+      <div class="note-item ${n.id === activeNoteId ? 'active' : ''}" onclick="openNote('${n.id}')">
+        <div class="ni-title">${esc(n.title || 'Untitled')}</div>
+        <div class="ni-preview">${esc(n.content || '—')}</div>
+        <div class="ni-date">${fmtDate(n.createdAt)}</div>
+      </div>
+    `).join('');
+  }
+
+  function newNote() {
+    isNew = true; activeNoteId = null;
+    renderNotesList();
+    showEditor();
+    document.getElementById('note-title').value = '';
+    document.getElementById('note-content').value = '';
+    document.getElementById('editor-meta').textContent = '';
+    document.getElementById('delete-btn').style.display = 'none';
+    document.getElementById('note-title').focus();
+  }
+
+  function openNote(id) {
+    const note = allNotes.find(n => n.id === id);
+    if (!note) return;
+    isNew = false; activeNoteId = id;
+    renderNotesList();
+    showEditor();
+    document.getElementById('note-title').value   = note.title;
+    document.getElementById('note-content').value = note.content;
+    document.getElementById('editor-meta').textContent = 'saved ' + fmtDate(note.createdAt);
+    document.getElementById('delete-btn').style.display = '';
+  }
+
+  function showEditor() {
+    document.getElementById('editor-placeholder').style.display = 'none';
+    document.getElementById('editor-form').style.display = 'flex';
+  }
+
+  function cancelEdit() {
+    activeNoteId = null; isNew = false;
+    document.getElementById('editor-form').style.display = 'none';
+    document.getElementById('editor-placeholder').style.display = '';
+    renderNotesList();
+  }
+
+  async function saveNote() {
+    const title   = document.getElementById('note-title').value.trim();
+    const content = document.getElementById('note-content').value.trim();
+    if (!title || !content) { showToast('Title and content are required', 'error'); return; }
+    const btn = document.getElementById('save-btn');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+      const method = isNew ? 'POST' : 'PUT';
+      const url    = isNew ? NOTES_URL+'/notes' : NOTES_URL+'/notes/'+activeNoteId;
+      const res    = await fetch(url, { method, headers:{ 'Content-Type':'application/json','Authorization':'Bearer '+token }, body: JSON.stringify({ title, content }) });
+      if (!res.ok) throw new Error();
+      const saved = await res.json();
+      if (isNew) { activeNoteId = saved.id; isNew = false; }
+      document.getElementById('delete-btn').style.display = '';
+      document.getElementById('editor-meta').textContent = 'saved just now';
+      await loadNotes();
+      showToast('Saved', 'success');
+    } catch {
+      showToast('Failed to save', 'error');
+    } finally {
+      btn.disabled = false; btn.textContent = 'Save';
+    }
+  }
+
+  async function deleteNote() {
+    if (!activeNoteId || !confirm('Delete this note?')) return;
+    try {
+      const res = await fetch(NOTES_URL+'/notes/'+activeNoteId, { method:'DELETE', headers:{ 'Authorization':'Bearer '+token } });
+      if (!res.ok) throw new Error();
+      activeNoteId = null;
+      document.getElementById('editor-form').style.display = 'none';
+      document.getElementById('editor-placeholder').style.display = '';
+      await loadNotes();
+      showToast('Deleted', 'success');
+    } catch {
+      showToast('Failed to delete', 'error');
+    }
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  function showToast(msg, type='') {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className = 'toast ' + type + ' show';
+    setTimeout(() => { el.className = 'toast'; }, 2600);
+  }
+
+  function esc(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function fmtDate(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    const now = new Date();
+    const diff = now - d;
+    if (diff < 60000)     return 'just now';
+    if (diff < 3600000)   return Math.floor(diff/60000) + 'm ago';
+    if (diff < 86400000)  return 'today ' + d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+    if (diff < 172800000) return 'yesterday';
+    return d.toLocaleDateString([], {month:'short', day:'numeric'});
+  }
+
+  // ── Enter key ─────────────────────────────────────────────────────────────
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    const authVisible = document.getElementById('auth-screen').style.display !== 'none';
+    if (!authVisible) return;
+    const loginVisible = document.getElementById('login-form').style.display !== 'none';
+    if (loginVisible) handleLogin(); else handleRegister();
+  });
+
+  // ── Cmd/Ctrl+S to save ────────────────────────────────────────────────────
+  document.addEventListener('keydown', e => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+      e.preventDefault();
+      const formVisible = document.getElementById('editor-form').style.display !== 'none';
+      if (formVisible) saveNote();
+    }
+  });
+</script>
+</body>
+</html>
