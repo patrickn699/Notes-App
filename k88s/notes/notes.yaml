@@ -36,6 +36,16 @@ spec:
                 configMapKeyRef:
                   name: app-config
                   key: auth-service-url
+            - name: BLOB_CONNECTION_STRING
+              valueFrom:
+                secretKeyRef:
+                  name: blob-credentials
+                  key: connection-string
+            - name: BLOB_CONTAINER
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: blob-container
             # Postgres
             - name: PG_HOST
               value: "postgres.database.svc.cluster.local"

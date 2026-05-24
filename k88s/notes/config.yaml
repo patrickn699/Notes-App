@@ -6,3 +6,4 @@ metadata:
 data:
   # Full cross-namespace DNS: <service>.<namespace>.svc.cluster.local
   auth-service-url: "http://auth-svc.authentication.svc.cluster.local:3001"
+  blob-container: "notes"
