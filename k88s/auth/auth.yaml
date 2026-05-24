@@ -5,8 +5,8 @@ metadata:
   labels:
     name: authentication
 ---
-apiVersion: apps/v1          # ← was "applications/v1" — does not exist
-kind: Deployment             # ← was "Application" — does not exist
+apiVersion: apps/v1
+kind: Deployment
 metadata:
   name: auth
   namespace: authentication
@@ -24,7 +24,7 @@ spec:
     spec:
       containers:
         - name: authentication-service
-          image: calude-micro-svc-auth-service:latest  # ← verify this matches your actual docker image name
+          image: calude-micro-svc-auth-service:latest
           imagePullPolicy: Never
           ports:
             - containerPort: 3001
@@ -36,7 +36,6 @@ spec:
                 secretKeyRef:
                   name: app-secrets
                   key: jwt-secret
-            # Postgres — points to postgres service in database namespace
             - name: PG_HOST
               value: "postgres.database.svc.cluster.local"
             - name: PG_PORT
@@ -53,22 +52,41 @@ spec:
                 secretKeyRef:
                   name: pg-credentials
                   key: password
+            # GitHub OAuth
+            - name: GITHUB_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: github-credentials
+                  key: client-id
+            - name: GITHUB_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: github-credentials
+                  key: client-secret
+            # Base URL of auth-service — used for OAuth callback URL
+            # For minikube use the minikube IP + NodePort of auth-service
+            # For AKS use your real domain
+            - name: BASE_URL
+              value: "http://192.168.49.2:30301"
+            # Frontend URL — where to redirect after successful OAuth
+            - name: FRONTEND_URL
+              value: "http://127.0.0.1:64224"
           readinessProbe:
-            httpGet:                 # ← was missing httpGet wrapper
+            httpGet:
               path: /health
               port: 3001
-            initialDelaySeconds: 5
+            initialDelaySeconds: 15
             periodSeconds: 10
           livenessProbe:
-            httpGet:                 # ← was missing httpGet wrapper
+            httpGet:
               path: /health
               port: 3001
-            initialDelaySeconds: 10
+            initialDelaySeconds: 20
             periodSeconds: 15
           resources:
             requests:
               cpu: "50m"
               memory: "64Mi"
             limits:
-              cpu: "100m"
+              cpu: "200m"
               memory: "128Mi"

@@ -37,6 +37,8 @@ spec:
               value: "notes-svc.notes.svc.cluster.local"
             - name: NOTES_SVC_PORT
               value: "3002"
+            - name: AUTH_SVC_BASE_URL
+              value: "192.168.49.2:30301"
           readinessProbe:
             httpGet:                 # ← was "httpPath/httpPort" — invalid
               path: /
