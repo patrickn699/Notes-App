@@ -675,7 +675,7 @@
   });
 
   // ── GitHub SSO ────────────────────────────────────────────────────────────
-  const AUTH_SERVICE_DIRECT = "http://192.168.49.2:30301"; //window.AUTH_SERVICE_DIRECT || "http://localhost:3001";
+  const AUTH_SERVICE_DIRECT = process.env.AUTH_SVC_BASE_URL   || "http://127.0.0.1:50448";
 
   function loginWithGitHub() {
     window.location.href = AUTH_SERVICE_DIRECT + "/auth/github";

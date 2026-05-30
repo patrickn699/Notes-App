@@ -38,7 +38,7 @@ spec:
             - name: NOTES_SVC_PORT
               value: "3002"
             - name: AUTH_SVC_BASE_URL
-              value: "192.168.49.2:30301"
+              value: "127.0.0.1:50448" #"192.168.49.2:30301"
           readinessProbe:
             httpGet:                 # ← was "httpPath/httpPort" — invalid
               path: /

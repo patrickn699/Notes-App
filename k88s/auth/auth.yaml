@@ -67,10 +67,10 @@ spec:
             # For minikube use the minikube IP + NodePort of auth-service
             # For AKS use your real domain
             - name: BASE_URL
-              value: "http://192.168.49.2:30301"
+              value: "http://127.0.0.1:50448" #"http://192.168.49.2:30301" # -> auth svc
             # Frontend URL — where to redirect after successful OAuth
             - name: FRONTEND_URL
-              value: "http://127.0.0.1:64224"
+              value: "http://127.0.0.1:59350"
           readinessProbe:
             httpGet:
               path: /health
